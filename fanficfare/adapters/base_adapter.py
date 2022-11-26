@@ -651,14 +651,31 @@ class BaseSiteAdapter(Requestable):
         if self.getConfig('include_images'):
             ## actually effects all tags' attrs, not just <img>, but I'm okay with that.
             acceptable_attributes.extend(('src','alt','longdesc'))
+
+            for anchor in soup.find_all('a', href=True):
+                href = anchor['href']
+                if any(chunk in href for chunk in ['.png', '.jpeg', 'https://encrypted-tbn0.gstatic.com/images']):
+                    img = BeautifulSoup(f"<p>{anchor.string}</p><img src='{href}'></img>", 'html.parser')
+                    anchor.insert_after(img)
+                    anchor.decompose()
+
+            decompose_list = []
+
             for img in soup.find_all('img'):
-                try:
-                    # some pre-existing epubs have img tags that had src stripped off.
-                    if img.has_attr('src'):
-                        (img['src'],img['longdesc'])=self.story.addImgUrl(url,img['src'],fetch,
-                                                                          coverexclusion=self.getConfig('cover_exclusion_regexp'))
-                except AttributeError as ae:
-                    logger.info("Parsing for img tags failed--probably poor input HTML.  Skipping img(%s)"%img)
+                if img not in decompose_list:
+                    try:
+                        # some pre-existing epubs have img tags that had src stripped off.
+                        if img.has_attr('src'):
+                            for otherImg in img.parent.parent.select(f"div img[src='{img['src']}']"):
+                                if img is not otherImg:
+                                    decompose_list.append(otherImg)
+                            (img['src'],img['longdesc'])=self.story.addImgUrl(url,img['src'],fetch,
+                                                                            coverexclusion=self.getConfig('cover_exclusion_regexp'))
+                    except AttributeError as ae:
+                        logger.info("Parsing for img tags failed--probably poor input HTML.  Skipping img(%s)"%img)
+            
+            for img in decompose_list:
+                img.parent.decompose() if img.parent is not None else None
         else:
             ## remove all img tags entirely
             for img in soup.find_all('img'):

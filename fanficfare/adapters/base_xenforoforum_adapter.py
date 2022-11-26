@@ -228,14 +228,14 @@ class BaseXenForoForumAdapter(BaseSiteAdapter):
         soup = super(BaseXenForoForumAdapter, self).make_soup(data)
         ## img class="lazyload"
         ## include lazy load images.
-        for img in soup.find_all('img',{'class':'lazyload'}):
+        for img in soup.find_all('img',{'class':re.compile('(?i:lazyload(ed)?)')}):
             # logger.debug("img:%s"%img)
             ## SV at least has started using data-url instead of
             ## data-src, notably for <img> inside <noscript>?
-            if img.has_attr('data-src'):
-                img['src'] = img['data-src']
             if img.has_attr('data-url'):
                 img['src'] = img['data-url']
+            if img.has_attr('data-src'):
+                img['src'] = img['data-src']
             # logger.debug("\n\nimg:%s\n"%img)
 
         ## after lazy load images, there are noscript blocks also
